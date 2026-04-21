@@ -33,6 +33,9 @@ out/
 logs/
 *.log
 
+#img
+img/
+
 # Environment variables - 包含敏感信息的配置文件
 .env
 .env.local
