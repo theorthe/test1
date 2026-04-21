@@ -1,0 +1,65 @@
+XML 映射文件应该放在 resources 目录下
+不要随便放，否则会导致无法找到映射文件，报错
+如果放在src下的话，编译后会放在target/classes目录下，还是无法找到映射文件，报错（要改pom.xml的代码）
+如果放在resources目录下，编译后会放在target/classes目录下，能够找到映射文件，正常运行
+所以，XML 映射文件应该放在 resources 目录下，才能被正确加载和使用
+
+
+application.yml 配置文件应该放在 resources 目录下
+如果 application.yml 配置文件放在 src 目录下，编译后会放在 target/classes 目录下，能够被正确加载和使用
+而且该文件内容的层级要非常小心，内容要注意层级关系，不能随便缩进，否则会导致无法正确解析配置文件，报错
+缩进是两个空格，不能使用Tab键，否则会导致无法正确解析配置文件，报错
+
+
+事务处理回滚：
+- 在Spring的事务管理中，默认只有运行时异常 RuntimeException才会回滚。
+- 如果还需要回滚指定类型的异常，可以通过rollbackFor属性来指定。
+
+Propagation.REQUIRES_NEW  ：不论是否有事务，都创建新事务  ，运行在一个独立的事务中。
+- REQUIRED：大部分情况下都是用该传播行为即可。
+- REQUIRES_NEW：当我们不希望事务之间相互影响时，可以使用该传播行为。
+  比如：下订单前需要记录日志，不论订单保存成功与否，都需要保证日志记录能够记录成功。
+
+事务的四大特性简称为：ACID
+[图片]
+- 原子性（Atomicity） ：原子性是指事务包装的一组sql是一个不可分割的工作单元，事务中的操作要么全部成功，要么全部失败。
+- 一致性（Consistency）：一个事务完成之后数据都必须处于一致性状态。
+  - 如果事务成功的完成，那么数据库的所有变化将生效。
+  - 如果事务执行出现错误，那么数据库的所有变化将会被回滚(撤销)，返回到原始状态。
+- 隔离性（Isolation）：多个用户并发的访问数据库时，一个用户的事务不能被其他用户的事务干扰，多个并发的事务之间要相互隔离。
+  - 一个事务的成功或者失败对于其他的事务是没有影响。
+- 持久性（Durability）：一个事务一旦被提交或回滚，它对数据库的改变将是永久性的，哪怕数据库发生异常，重启之后数据亦然存在。
+
+阿里云配置
+指导课程
+https://help.aliyun.com/zh/oss/developer-reference/oss-java-sdk/?spm=a2c4g.11186623.help-menu-31815.d_1_1_1.7fb96e0aDZjz0H&scm=20140722.H_32008._.OR_help-T_cn~zh-V_1
+在范例代码中，需要替换的内容为：
+- endpoint：阿里云OSS中的bucket对应的域名
+- bucketName：Bucket名称
+- objectName：对象名称，在Bucket中存储的对象的名称
+- region：bucket所属区域
+
+
+
+在一对多的查询中，我们要想成功的封装的结果，需要手动的基于 <resultMap> 来进行封装结果。
+
+如test/zsc/management/mapper/EmpMapper.xml里的例子
+Mybatis中封装查询结果，什么时候用 resultType，什么时候用resultMap ？
+- 如果查询返回的字段名与实体的属性名可以直接对应上，用resultType 。
+- 如果查询返回的字段名与实体的属性名对应不上，或实体属性比较复杂，可以通过resultMap手动封装 。
+
+
+异常处理
+当我们没有做任何的异常处理时，我们三层架构处理异常的方案：
+- Mapper接口在操作数据库的时候出错了，此时异常会往上抛(谁调用Mapper就抛给谁)，会抛给service。
+- service 中也存在异常了，会抛给controller。
+- 而在controller当中，我们也没有做任何的异常处理，所以最终异常会再往上抛。
+最终抛给框架之后，框架就会返回一个JSON格式的数据，里面封装的就是错误的信息，但是框架返回的JSON格式的数据并不符合我们的开发规范。
+
+
+优先级
+application.yml小于application.p
+
+
+SSM(Spring+sMVC+mybatis)
+

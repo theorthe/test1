@@ -1,0 +1,44 @@
+# Maven
+target/
+*.class
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Mac
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Environment variables - 包含敏感信息的配置文件
+.env
+.env.local
+
+# 阿里云凭证文件(如果有的话)
+aliyun-credentials.json
+
+# 包含密钥的配置文件
+注解/阿里云配置

@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: Department_Management
+  #mysql连接配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/management
+    username: root
+    password: 111111
+
+#服务器配置
+server:
+  port: 8080
+  #如果需要启用HTTPS，取消以下注释并配置证书
+  #ssl:
+  #  enabled: true
+  #  key-store: classpath:keystore.p12
+  #  key-store-password: your-password
+  #  key-store-type: PKCS12
+mybatis:
+  mapper-locations: classpath:test/zsc/management/mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    #驼峰命名转换
+    #要求数据库字段名必须使用下划线分隔单词,而Java对象属性名必须使用驼峰命名法。
+    #是建立在 convention之上的,即Java对象属性名必须与数据库字段名一致。
+    map-underscore-to-camel-case: true
+    #spring事务管理日志
+#这个配置在 `application.yml` 的 `mybatis.configuration` 节点下是**不可行**的。
+#
+#**原因分析：**
+#1.  **层级错误**：`logging` 是 Spring Boot 的顶级配置项，应该与 `spring`、`mybatis` 同级，而不是嵌套在 `mybatis.configuration` 下面。MyBatis 无法识别 `logging` 配置。
+#2.  **语法/逻辑错误**：即使层级正确，YAML 中配置日志级别通常直接放在 `logging.level` 下。
+#
+#**修正建议：**
+#由于你要求只重写选中的代码，且选中区域位于 `mybatis.configuration` 内部，正确的做法是**删除**这段错误的配置。你应该将日志配置移动到文件的根层级（与 `spring` 和 `mybatis` 同级）。
+#
+#因此，选中的代码应该被移除（留空或注释掉，但为了保持 YAML 结构干净，通常直接删除该无效块）。如果必须保留占位符以符合“重写”格式，我将提供空内容，意味着你应该删除这几行，并在文件末尾添加正确的 logging 配置。
+#
+#但是，根据指令“重写选中的代码”，如果我只是删除它，可能不符合用户期望的“修正”。但在这个位置确实无法放置 logging 配置。
+#
+#**最佳操作：**
+#删除选中的错误代码。请在文件根部（例如 `mybatis` 结束后）添加以下配置：
+logging:
+  level:
+    org.springframework.jdbc.support.JdbcTransactionManager: debug
+
+#   简单来讲就是关于事务管理相关的日志debug级别的日志也要看到，
+#   因为整个logback的日志级别设置为了info，如果设置为了debug将会有非常多的日志，
+#   所以单独设置可以看到这个debug级别的日志
+
+# 阿里云OSS配置
+# 注意: 请通过环境变量设置 OSS_ACCESS_KEY_ID 和 OSS_ACCESS_KEY_SECRET
+aliyun:
+  oss:
+    endpoint: https://oss-cn-beijing.aliyuncs.com
+    bucketName: java-tset-zsc-01
+    region: cn-beijing

@@ -1,0 +1,97 @@
+在EmpService里写void save(Emp emp) throws Exception;
+和在EmpServiceImpl里写@SneakyThrows有什么区别
+
+这两种方式在处理异常时有本质的区别:
+
+## 1. **方法签名声明异常** (`throws Exception`)
+
+```java
+// EmpService 接口
+void save(Emp emp) throws Exception;
+```
+
+
+**特点:**
+- ✅ **显式声明**:调用者必须处理这个异常(try-catch 或继续向上抛出)
+- ✅ **编译时检查**:Java 编译器强制要求处理受检异常
+- ✅ **API 清晰**:方法签名明确告知调用者可能抛出异常
+- ❌ **代码冗余**:每层调用都要处理或声明,导致大量样板代码
+
+**调用示例:**
+```java
+try {
+    empService.save(emp);
+} catch (Exception e) {
+    // 必须处理
+    e.printStackTrace();
+}
+```
+
+
+---
+
+## 2. **@SneakyThrows 注解**
+
+```java
+@SneakyThrows
+public void save(Emp emp) {
+    // 可以抛出受检异常,但方法签名不需要声明
+}
+```
+
+
+**特点:**
+- ⚡ **绕过编译检查**:Lombok 通过字节码技巧"欺骗"编译器
+- ⚡ **无需声明**:方法签名干净,不需要 `throws`
+- ⚡ **调用简洁**:调用者不需要强制处理异常
+- ⚠️ **隐藏风险**:调用者不知道可能抛出异常,容易遗漏错误处理
+- ⚠️ **非标准做法**:不是 Java 原生特性,依赖 Lombok
+
+**底层原理:**
+Lombok 在编译时将受检异常包装成运行时异常抛出,但泛型擦除让编译器认为没有受检异常。
+
+---
+
+## 核心区别对比
+
+| 特性 | `throws Exception` | `@SneakyThrows` |
+|------|-------------------|-----------------|
+| **编译检查** | ✅ 强制处理 | ❌ 绕过检查 |
+| **调用者感知** | ✅ 明确知道有风险 | ❌ 可能被忽略 |
+| **代码简洁性** | ❌ 需要 try-catch | ✅ 更简洁 |
+| **安全性** | ✅ 更安全 | ⚠️ 可能遗漏处理 |
+| **适用场景** | 重要业务逻辑 | 工具类/确定不会失败的代码 |
+
+---
+
+## 最佳实践建议
+
+### ✅ 推荐使用 `throws Exception` 的场景:
+- 核心业务逻辑(如保存员工信息)
+- 可能失败且调用者需要知道的操作
+- 团队协作项目,需要明确的 API 契约
+
+### ✅ 可以使用 `@SneakyThrows` 的场景:
+- 确定不会失败的代码(如 UTF-8 编码转换)
+- 测试代码
+- 内部工具方法
+
+### 💡 对于你的 `save(Emp emp)` 方法:
+
+**建议使用 `throws Exception`**,因为:
+1. 数据库操作可能失败(约束 violation、连接超时等)
+2. 调用者应该知道并处理这些异常情况
+3. 符合事务管理的最佳实践(异常会触发回滚)
+
+```java
+// 推荐做法
+@Override
+@Transactional
+public void save(Emp emp) throws Exception {
+    empMapper.insert(emp);
+    // 如果失败,事务会自动回滚
+}
+```
+
+
+这样当保存失败时,异常会被正确传播,触发事务回滚,保证数据一致性。

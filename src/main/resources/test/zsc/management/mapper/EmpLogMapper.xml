@@ -1,0 +1,14 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="test.zsc.management.mapper.EmpLogMapper">
+
+    <!--分页查询日志-->
+    <select id="list" resultType="test.zsc.management.pojo.EmpLog">
+        select id, operate_time, info
+        from emp_log
+        order by operate_time desc
+    </select>
+
+</mapper>

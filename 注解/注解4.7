@@ -1,0 +1,841 @@
+2.2删除部门
+3.4 简单参数接收
+我们看到，在controller中，需要接收前端传递的请求参数。
+ 那接下来，我们就先来看看在服务器端的Controller程序中，如何获取这类简单参数。
+  具体的方案有如下三种：
+- 方案一：通过原始的 HttpServletRequest 对象获取请求参数
+
+/**
+* 根据ID删除部门 - 简单参数接收: 方式一 (HttpServletRequest)
+*/
+@DeleteMapping("/depts")
+public Result delete(HttpServletRequest request){
+    String idStr = request.getParameter("id");
+    int id = Integer.parseInt(idStr);
+
+    System.out.println("根据ID删除部门: " + id);
+    return Result.success();
+}
+//这种方案实现较为繁琐，而且还需要进行手动类型转换。【项目开发很少用】
+
+
+- 方案二：通过Spring提供的 @RequestParam 注解，将请求参数绑定给方法形参
+
+@DeleteMapping("/depts")
+public Result delete(@RequestParam("id") Integer deptId){
+    System.out.println("根据ID删除部门: " + deptId);
+    return Result.success();
+}
+@RequestParam 注解的value属性，需要与前端传递的参数名保持一致 。
+@RequestParam注解required属性默认为true，代表该参数必须传递，如果不传递将报错。 如果参数可选，可以将属性设置为false。
+
+
+- 方案三：如果请求参数名与形参变量名相同，直接定义方法形参即可接收。（省略@RequestParam）
+
+@DeleteMapping("/depts")
+public Result delete(Integer id){
+    System.out.println("根据ID删除部门: " + deptId);
+    return Result.success();
+}
+
+对于以上的这三种方案呢，我们推荐第三种方案。
+
+3.5 代码实现
+1). Controller层
+在 DeptMapper  中，增加 delete 方法，代码实现如下：
+/**
+ * 根据id删除部门 - delete http://localhost:8080/depts?id=1
+ */
+@DeleteMapping("/depts")
+public Result delete(Integer id){
+    System.out.println("根据id删除部门, id=" + id);
+    deptService.deleteById(id);
+    return Result.success();
+}
+
+2). Service层
+在 DeptService 中，增加 deleteById 方法，代码实现如下：
+/**
+ * 根据id删除部门
+ */
+void deleteById(Integer id);
+在 DeptServiceImpl 中，增加 deleteById 方法，代码实现如下：
+public void deleteById(Integer id) {
+    deptMapper.deleteById(id);
+}
+
+3). Mapper层
+在 DeptMapper 中，增加 deleteById 方法，代码实现如下：
+/**
+ * 根据id删除部门
+ */
+@Delete("delete from dept where id = #{id}")
+void deleteById(Integer id);
+
+如果mapper接口方法形参只有一个普通类型的参数，#{…} 里面的属性名可以随便写，如：#{id}、#{value}。
+对于 DML 语句来说，执行完毕，也是有返回值的，返回值代表的是增删改操作，影响的记录数，所以可以将执行 DML 语句的方法返回值设置为 Integer。 但是一般开发时，是不需要这个返回值的，所以也可以设置为void。
+
+代码编写完毕之后，我们就可以启动服务，进行测试了。
+
+4. 新增部门
+4.1 需求
+点击 "新增部门" 的按钮之后，弹出新增部门表单，填写部门名称之后，点击确定之后，保存部门数据。
+[图片]
+了解了需求之后，我们再看看接口文档中，关于新增部门的接口的描述，然后根据接口文档进行服务端接口的开发 。
+
+4.2 接口描述
+参照课程资料中提供的接口文档。 部门管理 -> 新增部门
+
+4.3 思路分析
+明确了新增部门的需求之后，再来梳理一下实现该功能时，三层架构每一层的职责：
+[图片]
+
+4.4 json参数接收
+我们看到，在controller中，需要接收前端传递的请求参数。 那接下来，我们就先来看看在服务器端的Controller程序中，如何获取json格式的参数。
+- JSON格式的参数，通常会使用一个实体对象进行接收 。
+- 规则：JSON数据的键名与方法形参对象的属性名相同，并需要使用@RequestBody注解标识。
+
+前端传递的请求参数格式为json，内容如下：{"name":"研发部"}。这里，我们可以通过一个对象来接收，只需要保证对象中有name属性即可。
+[图片]
+
+4.5 代码实现
+1). Controller层
+在DeptController中增加方法save，具体代码如下：
+/**
+ * 新增部门 - POST http://localhost:8080/depts   请求参数：{"name":"研发部"}
+ */
+@PostMapping("/depts")
+public Result save(@RequestBody Dept dept){
+    System.out.println("新增部门, dept=" + dept);
+    deptService.save(dept);
+    return Result.success();
+}
+
+2). Service层
+在DeptService中增加接口方法save，具体代码如下：
+/**
+ * 新增部门
+ */
+void save(Dept dept);
+在DeptServiceImpl中增加save方法，完成添加部门的操作，具体代码如下：
+public void save(Dept dept) {
+    //补全基础属性
+    dept.setCreateTime(LocalDateTime.now());
+    dept.setUpdateTime(LocalDateTime.now());
+    //保存部门
+    deptMapper.insert(dept);
+}
+
+3). Mapper层
+/**
+ * 保存部门
+ */
+@Insert("insert into dept(name,create_time,update_time) values(#{name},#{createTime},#{updateTime})")
+void insert(Dept dept);
+如果在mapper接口中，需要传递多个参数，可以把多个参数封装到一个对象中。 在SQL语句中获取参数的时候，#{...} 里面写的是对象的属性名【注意是属性名，不是表的字段名】。
+
+代码编写完毕之后，我们就可以启动服务，进行测试了。
+
+
+5. 修改部门
+对于任何业务的修改功能来说，一般都会分为两步进行：查询回显、修改数据。
+[图片]
+
+5.1 查询回显
+5.1.1 需求
+当我们点击 "编辑" 的时候，需要根据ID查询部门数据，然后用于页面回显展示。
+[图片]
+
+5.1.2 接口描述
+参照参照课程资料中提供的接口文档。 部门管理 -> 根据ID查询
+
+5.1.3 思路分析
+明确了根据ID查询部门的需求之后，再来梳理一下实现该功能时，三层架构每一层的职责：
+[图片]
+了解了需求之后，我们再看看接口文档中，关于根据ID查询部门的接口的描述，然后根据接口文档进行服务端接口的开发 。
+
+5.1.4 路径参数接收
+/depts/1，/depts/2 这种在url中传递的参数，我们称之为路径参数。 那么如何接收这样的路径参数呢 ？
+路径参数：通过请求URL直接传递参数，使用{…}来标识该路径参数，需要使用 @PathVariable获取路径参数。如下所示：
+[图片]
+如果路径参数名与controller方法形参名称一致，@PathVariable注解的value属性是可以省略的。
+
+5.1.5 代码实现
+1). Controller层
+在 DeptController 中增加 getById方法，具体代码如下：
+/**
+ * 根据ID查询 - GET http://localhost:8080/depts/1
+ */
+@GetMapping("/depts/{id}")
+public Result getById(@PathVariable Integer id){
+    System.out.println("根据ID查询, id=" + id);
+    Dept dept = deptService.getById(id);
+    return Result.success(dept);
+}
+
+2). Service层
+在 DeptService 中增加 getById方法，具体代码如下：
+/**
+ * 根据id查询部门
+ */
+Dept getById(Integer id);
+在 DeptServiceImpl 中增加 getById方法，具体代码如下：
+public Dept getById(Integer id) {
+    return deptMapper.getById(id);
+}
+
+3). Mapper层
+在 DeptMapper 中增加 getById 方法，具体代码如下：
+/**
+* 根据ID查询部门数据
+*/
+@Select("select id, name, create_time, update_time from dept where id = #{id}")
+Dept getById(Integer id);
+
+代码编写完毕之后，我们就可以启动服务，进行测试了。
+
+
+5.2 修改数据
+5.2.1 需求
+查询回显回来之后，就可以对部门的信息进行修改了，修改完毕之后，点击确定，此时，就需要根据ID修改部门的数据。
+[图片]
+了解了需求之后，我们再看看接口文档中，关于修改部门的接口的描述，然后根据接口文档进行服务端接口的开发 。
+
+5.2.2 接口描述
+参照参照课程资料中提供的接口文档。 部门管理 -> 修改部门
+
+5.2.3 思路分析
+参照接口文档，梳理三层架构每一层的职责：
+[图片]
+通过接口文档，我们可以看到前端传递的请求参数是json格式的请求参数，在Controller的方法中，我们可以通过 @RequestBody 注解来接收，并将其封装到一个对象中。
+
+5.2.4 代码实现
+1). Controller层
+在 DeptController 中增加 update 方法，具体代码如下：
+/**
+ * 修改部门 - PUT http://localhost:8080/depts  请求参数：{"id":1,"name":"研发部"}
+ */
+@PutMapping("/depts")
+public Result update(@RequestBody Dept dept){
+    System.out.println("修改部门, dept=" + dept);
+    deptService.update(dept);
+    return Result.success();
+}
+
+2). Service层
+在 DeptService 中增加 update 方法。
+/**
+ * 修改部门
+ */
+void update(Dept dept);
+在 DeptServiceImpl 中增加 update 方法。 由于是修改操作，每一次修改数据，都需要更新updateTime。所以，具体代码如下：
+public void update(Dept dept) {
+    //补全基础属性
+    dept.setUpdateTime(LocalDateTime.now());
+    //保存部门
+    deptMapper.update(dept);
+}
+
+3). Mapper层
+在 DeptMapper 中增加 update 方法，具体代码如下：
+/**
+ * 更新部门
+ */
+@Update("update dept set name = #{name},update_time = #{updateTime} where id = #{id}")
+void update(Dept dept);
+
+代码编写完毕之后，我们就可以启动服务，进行测试了。
+
+5.2.5 @RequestMapping
+到此呢，关于基本的部门的增删改查功能，我们已经实现了。  我们会发现，我们在 DeptController 中所定义的方法，所有的请求路径，都是 /depts 开头的，只要操作的是部门数据，请求路径都是 /depts 开头。
+那么这个时候，我们其实是可以把这个公共的路径 /depts 抽取到类上的，那在各个方法上，就可以省略了这个 /depts 路径。 代码如下：
+[图片]
+一个完整的请求路径，应该是类上的 @RequestMapping 的value属性 + 方法上的 @RequestMapping的value属性。
+
+6.2 日志框架
+[图片]
+- JUL：这是JavaSE平台提供的官方日志框架，也被称为JUL。配置相对简单，但不够灵活，性能较差。
+- Log4j：一个流行的日志框架，提供了灵活的配置选项，支持多种输出目标。
+- Logback：基于Log4j升级而来，提供了更多的功能和配置选项，性能由于Log4j。
+- Slf4j：（Simple Logging Facade for Java）简单日志门面，提供了一套日志操作的标准接口及抽象类，允许应用程序使用不同的底层日志框架。
+
+6.3 Logback入门
+1). 准备工作：引入logback的依赖（springboot中无需引入，在springboot中已经传递了此依赖）
+<dependency>
+    <groupId>ch.qos.logback</groupId>
+    <artifactId>logback-classic</artifactId>
+    <version>1.4.11</version>
+</dependency>
+
+2). 引入配置文件 logback.xml  （资料中已经提供，拷贝进来，放在 src/main/resources 目录下； 或者直接AI生成）
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 控制台输出 -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度  %msg：日志消息，%n是换行符 -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50}-%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 日志输出级别 -->
+    <root level="ALL">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
+
+3). 记录日志：定义日志记录对象Logger，记录日志
+public class LogTest {
+
+    //定义日志记录对象
+    private static final Logger log = LoggerFactory.getLogger(LogTest.class);
+
+    @Test
+    public void testLog(){
+        log.debug("开始计算...");
+        int sum = 0;
+        int[] nums = {1, 5, 3, 2, 1, 4, 5, 4, 6, 7, 4, 34, 2, 23};
+        for (int i = 0; i < nums.length; i++) {
+            sum += nums[i];
+        }
+        log.info("计算结果为: "+sum);
+        log.debug("结束计算...");
+    }
+
+}
+运行单元测试，可以在控制台中看到输出的日志，如下所示：
+[图片]
+我们可以看到在输出的日志信息中，不仅输出了日志的信息，还包括：日志的输出时间、线程名、具体在那个类中输出的。
+
+6.4 Logback配置文件
+Logback日志框架的配置文件叫 logback.xml 。
+该配置文件是对Logback日志框架输出的日志进行控制的，可以来配置输出的格式、位置及日志开关等。
+常用的两种输出日志的位置：控制台、系统文件。
+
+1). 如果需要输出日志到控制台。添加如下配置：
+<!-- 控制台输出 -->
+<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!--格式化输出：%d 表示日期，%thread 表示线程名，%-5level表示级别从左显示5个字符宽度，%msg表示日志消息，%n表示换行符 -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50}-%msg%n</pattern>
+    </encoder>
+</appender>
+
+2). 如果需要输出日志到文件。添加如下配置：
+<!-- 按照每天生成日志文件 -->
+<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <!-- 日志文件输出的文件名, %i表示序号 -->
+        <FileNamePattern>D:/tlias-%d{yyyy-MM-dd}-%i.log</FileNamePattern>
+        <!-- 最多保留的历史日志文件数量 -->
+        <MaxHistory>30</MaxHistory>
+        <!-- 最大文件大小，超过这个大小会触发滚动到新文件，默认为 10MB -->
+        <maxFileSize>10MB</maxFileSize>
+    </rollingPolicy>
+
+    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+        <!--格式化输出：%d 表示日期，%thread 表示线程名，%-5level表示级别从左显示5个字符宽度，%msg表示日志消息，%n表示换行符 -->
+        <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50}-%msg%n</pattern>
+    </encoder>
+</appender>
+
+3). 日志开关配置 （开启日志（ALL），取消日志（OFF））
+<!-- 日志输出级别 -->
+<root level="ALL">
+    <!--输出到控制台-->
+    <appender-ref ref="STDOUT" />
+    <!--输出到文件-->
+    <appender-ref ref="FILE" />
+</root>
+
+6.5 Logback日志级别
+日志级别指的是日志信息的类型，日志都会分级别，常见的日志级别如下（优先级由低到高）：
+一定要见图
+
+
+可以在配置文件logback.xml中，灵活的控制输出那些类型的日志。（大于等于配置的日志级别的日志才会输出）
+<!-- 日志输出级别 -->
+<root level="info">
+    <!--输出到控制台-->
+    <appender-ref ref="STDOUT" />
+    <!--输出到文件-->
+    <appender-ref ref="FILE" />
+</root>
+
+6.6 案例日志记录
+/**
+ * 部门管理控制器
+ */
+@Slf4j
+@RequestMapping("/depts")
+@RestController
+public class DeptController {
+
+    @Autowired
+    private DeptService deptService;
+
+    /**
+     * 查询部门列表
+     */
+    //@RequestMapping(value = "/depts", method = RequestMethod.GET)
+    @GetMapping
+    public Result list(){
+        //System.out.println("查询部门列表");
+        log.info("查询部门列表");
+        List<Dept> deptList = deptService.findAll();
+        return Result.success(deptList);
+    }
+
+    /**
+     * 根据id删除部门 - delete http://localhost:8080/depts?id=1
+     */
+    @DeleteMapping
+    public Result delete(Integer id){
+        //System.out.println("根据id删除部门, id=" + id);
+        log.info("根据id删除部门, id: {}" , id);
+        deptService.deleteById(id);
+        return Result.success();
+    }
+
+    /**
+     * 新增部门 - POST http://localhost:8080/depts   请求参数：{"name":"研发部"}
+     */
+    @PostMapping
+    public Result save(@RequestBody Dept dept){
+        //System.out.println("新增部门, dept=" + dept);
+        log.info("新增部门, dept: {}" , dept);
+        deptService.save(dept);
+        return Result.success();
+    }
+
+    /**
+     * 根据ID查询 - GET http://localhost:8080/depts/1
+     */
+    @GetMapping("/{id}")
+    public Result getById(@PathVariable Integer id){
+        //System.out.println("根据ID查询, id=" + id);
+        log.info("根据ID查询, id: {}" , id);
+        Dept dept = deptService.getById(id);
+        return Result.success(dept);
+    }
+
+    /**
+     * 修改部门 - PUT http://localhost:8080/depts  请求参数：{"id":1,"name":"研发部"}
+     */
+    @PutMapping
+    public Result update(@RequestBody Dept dept){
+        //System.out.println("修改部门, dept=" + dept);
+        log.info("修改部门, dept: {}" , dept);
+        deptService.update(dept);
+        return Result.success();
+    }
+}
+lombok中提供的@Slf4j注解，可以简化定义日志记录器这步操作。添加了该注解，就相当于在类中定义了日志记录器，就下面这句代码：
+private static Logger log = LoggerFactory. getLogger(Xxx. class);
+
+
+
+
+
+
+
+
+见08~10的课（飞书）
+
+动态SQL
+动态SQL，即根据不同的条件生成不同的SQL语句。
+MyBatis提供了动态SQL的功能，可以根据不同的条件来生成不同的SQL语句，从而满足不同的查询需求。
+动态SQL的实现主要依赖于MyBatis提供的标签，如<if>、<choose>、<when>、<otherwise>等，这些标签可以在SQL语句中进行条件判断，从而动态生成SQL语句。
+例如，在查询部门列表时，我们可能需要根据部门名称进行模糊查询，如果前端传递了部门名称参数，我们就需要在SQL语句中添加模糊查询的条件，
+如果没有传递部门名称参数，我们就不需要添加模糊查询的条件
+
+笛卡尔积：笛卡尔乘积是指在数学中，两个集合(A集合和B集合)的所有组合情况。
+[图片]
+在多表查询时，需要消除无效的笛卡尔积，只保留表关联部分的数据。
+[图片]
+在SQL语句中，如何去除无效的笛卡尔积呢？只需要给多表查询加上连接查询的条件即可。
+
+select * from emp , dept where emp.dept_id = dept.id ;
+//在SQL语句中，emp.dept_id = dept.id 就是连接查询的条件，这样就可以去除无效的笛卡尔积了。
+
+
+2.1.3 分类
+多表查询可以分为：
+[图片]
+1. 连接查询
+  - 内连接：相当于查询A、B交集部分数据
+  - 外连接
+    - 左外连接：查询左表所有数据(包括两张表交集部分数据)
+    - 右外连接：查询右表所有数据(包括两张表交集部分数据)
+2. 子查询
+
+2.2 内连接
+内连接查询：查询两表或多表中交集部分数据。
+内连接从语法上可以分为：
+- 隐式内连接
+- 显式内连接
+
+隐式内连接语法：
+select  字段列表   from   表1 , 表2   where  条件 ... ;
+显式内连接语法：
+select  字段列表   from   表1  [ inner ]  join 表2  on  连接条件 ... ;
+
+- 案例1：查询所有员工的ID，姓名，及所属的部门名称
+  -  隐式内连接实现
+select emp.id, emp.name, dept.name from emp , dept where emp.dept_id = dept.id;
+  - 显式内连接实现
+select emp.id, emp.name, dept.name from emp inner join dept on emp.dept_id = dept.id;
+
+- 案例2：查询 性别为男, 且工资 高于8000 的员工的ID, 姓名, 及所属的部门名称
+  - 隐式内连接实现
+select emp.id, emp.name, dept.name from emp , dept where emp.dept_id = dept.id and emp.gender = 1 and emp.salary > 8000;
+  - 显式内连接实现
+select emp.id, emp.name, dept.name from emp inner join dept on emp.dept_id = dept.id where emp.gender = 1 and emp.salary > 8000;
+在多表联查时，我们指定字段时，需要在字段名前面加上表名，来指定具体是哪一张的字段。 如：emp.dept_id
+
+给表起别名简化书写：
+select  字段列表 from 表1 as 别名1 , 表2 as  别名2  where  条件 ... ;
+
+select  字段列表 from 表1 别名1 , 表2  别名2  where  条件 ... ;  -- as 可以省略
+使用了别名的多表查询：
+select e.id, e.name, d.name from emp as e , dept as d where e.dept_id = d.id and e.gender = 1 and e.salary > 8000;
+注意事项: 一旦为表起了别名，就不能再使用表名来指定对应的字段了，此时只能够使用别名来指定字段。
+
+2.3 外连接
+外连接分为两种：左外连接 和 右外连接。
+左外连接语法：
+select  字段列表   from   表1  left  [ outer ]  join 表2  on  连接条件 ... ;
+左外连接相当于查询表1(左表)的所有数据，当然也包含表1和表2交集部分的数据。
+
+右外连接语法：
+select  字段列表   from   表1  right  [ outer ]  join 表2  on  连接条件 ... ;
+右外连接相当于查询表2(右表)的所有数据，当然也包含表1和表2交集部分的数据。
+
+案例1：查询员工表 所有 员工的姓名, 和对应的部门名称 (左外连接)
+-- 左外连接：以left join关键字左边的表为主表，查询主表中所有数据，以及和主表匹配的右边表中的数据
+select e.name , d.name  from emp as e left join dept as d on e.dept_id = d.id ;
+案例2：查询部门表 所有 部门的名称, 和对应的员工名称 (右外连接)
+-- 右外连接：以right join关键字右边的表为主表，查询主表中所有数据，以及和主表匹配的左边表中的数据
+select e.name , d.name from emp as e right join dept as d on e.dept_id = d.id;
+案例3：查询工资 高于8000 的 所有员工的姓名, 和对应的部门名称 (左外连接)
+select e.name , d.name  from emp as e left join dept as d on e.dept_id = d.id where e.salary > 8000;
+注意事项：
+左外连接和右外连接是可以相互替换的，只需要调整连接查询时SQL语句中表的先后顺序就可以了。而我们在日常开发使用时，更偏向于左外连接。
+
+2.4 子查询
+2.4.1 介绍
+SQL语句中嵌套select语句，称为嵌套查询，又称子查询。
+SELECT  *  FROM   t1   WHERE  column1 =  ( SELECT  column1  FROM  t2 ... );
+子查询外部的语句可以是insert / update / delete / select 的任何一个，最常见的是 select。
+
+根据子查询结果的不同分为：
+1. 标量子查询（子查询结果为单个值 [一行一列]）
+2. 列子查询（子查询结果为一列，但可以是多行）
+3. 行子查询（子查询结果为一行，但可以是多列）
+4. 表子查询（子查询结果为多行多列[相当于子查询结果是一张表]）
+
+子查询可以书写的位置：
+1. where之后
+2. from之后
+3. select之后
+子查询的要点是，先对需求做拆分，明确具体的步骤，然后再逐条编写SQL语句。 最终将多条SQL语句合并为一条。
+
+2.4.2 标量子查询
+子查询返回的结果是单个值(数字、字符串、日期等)，最简单的形式，这种子查询称为标量子查询。
+常用的操作符： =   <>   >    >=    <   <=
+
+- 案例1：查询 最早入职 的员工信息
+-- 1. 查询最早的入职时间
+select min(entry_date) from emp;  -- 结果: 2000-01-01
+
+-- 2. 查询入职时间 = 最早入职时间的员工信息
+select * from emp where entry_date = '2000-01-01';
+
+-- 3. 合并为一条SQL
+select * from emp where entry_date = (select min(entry_date) from emp);
+
+- 案例2：查询在 阮小五 入职之后入职的员工信息
+-- 1. 查询 "阮小五" 的入职日期
+select entry_date from emp where name = '阮小五'; -- 结果: 2015-01-01
+
+-- 2. 根据上述查询到的这个入职日期, 查询在该日期之后入职的员工信息
+select * from emp where entry_date > '2015-01-01';
+
+-- 3. 合并SQL为一条SQL
+select * from emp where entry_date > (select entry_date from emp where name = '阮小五');
+
+2.4.3 列子查询
+子查询返回的结果是一列(可以是多行)，这种子查询称为列子查询。
+常用的操作符：
+暂时无法在飞书文档外展示此内容
+
+- 案例1：查询 "教研部" 和 "咨询部" 的所有员工信息
+-- 1. 查询 "教研部" 和 "咨询部" 的部门ID
+select id from dept where name = '教研部' or name = '咨询部'; -- 结果: 3,2
+
+-- 2. 根据上面查询出来的部门ID, 查询员工信息
+select * from emp where dept_id in(3,2);
+
+-- 3. 合并SQL为一条SQL语句
+select * from emp where dept_id in (select id from dept where name = '教研部' or name = '咨询部');
+
+2.4.4 行子查询
+子查询返回的结果是一行(可以是多列)，这种子查询称为行子查询。
+常用的操作符：= 、<> 、IN 、NOT IN
+
+- 案例1：查询与 "李忠" 的薪资 及 职位都相同的员工信息
+-- 1. 查询 "李忠" 的薪资和职位
+select salary , job from emp where name = '李忠'; -- 结果: 5000, 5
+
+-- 2. 根据上述查询到的薪资和职位 , 查询对应员工的信息
+select * from emp where (salary, job) = (5000,5);
+
+-- 3. 将两条SQL合并为一条SQL
+select * from emp where (salary, job) = (select salary , job from emp where name = '李忠');
+
+2.4.5 表子查询
+子查询返回的结果是多行多列，常作为临时表，这种子查询称为表子查询。
+
+- 案例：获取每个部门中薪资最高的员工信息
+-- a. 获取每个部门的最高薪资
+select dept_id, max(salary) from emp group by dept_id;
+
+-- b. 查询每个部门中薪资最高的员工信息
+select * from emp e , (select dept_id, max(salary) max_sal from emp group by dept_id) a
+    where e.dept_id = a.dept_id and e.salary = a.max_sal;
+
+2.4.6 案例
+根据需求，完成多表查询的SQL语句的编写。
+- 1. 查询 "教研部" 性别为 男，且在 "2011-05-01" 之后入职的员工信息 。
+select e.* from emp as e , dept as d where e.dept_id = d.id and d.name = '教研部' and e.gender = 1 and e.entry_date > '2011-05-01';
+
+- 2. 查询工资 低于公司平均工资的 且 性别为男 的员工信息 。
+select e.* from emp as e , dept as d where e.dept_id = d.id and e.salary < (select avg(salary) from emp) and e.gender = 1;
+
+- 3. 查询部门人数超过 10 人的部门名称 。
+select d.name , count(*) from emp as e , dept as d where e.dept_id = d.id group by d.name having count(*) > 10;
+
+- 4. 查询在 "2010-05-01" 后入职，且薪资高于 10000 的 "教研部" 员工信息，并根据薪资倒序排序。
+select * from emp e , dept d where e.dept_id = d.id and e.entry_date > '2010-05-01' and e.salary > 10000 and d.name = '教研部' order by e.salary desc;
+
+- 5. 查询工资 低于本部门平均工资的员工信息 。【难】
+-- 5.1 查询每个部门的平均工资
+select dept_id, avg(salary) avg_sal from emp group by dept_id;
+
+-- 5.2 查询工资 低于本部门平均工资 的员工信息 。
+select e.* from emp e , (select dept_id, avg(salary) avg_sal from emp group by dept_id) as a
+          where e.dept_id = a.dept_id and e.salary < a.avg_sal;
+
+
+
+如上是sql语句的编写，接下来
+要实现员工页面
+
+3.2 分页查询
+3.2.1 分析
+上述我们在Mapper接口中定义了接口方法，完成了查询所有员工及其部门名称的功能，是将数据库中所有的数据查询出来了。 试想如果数据库中的数据有很多(假设有几千几万条)的时候，将数据全部展示出来肯定不现实，那如何解决这个问题呢？
+使用分页解决这个问题。每次只展示一页的数据，比如：一页展示10条数据，如果还想看其他的数据，可以通过点击页码进行查询。
+而在员工管理的需求中，就要求我们进行分页查询，展示出对应的数据。 具体的页面原型如下：
+[图片]
+
+要想从数据库中进行分页查询，我们要使用LIMIT关键字，格式为：limit  开始索引  每页显示的条数。
+1). 查询第1页数据的SQL语句是：
+select * from emp  limit 0,10;
+2). 查询第2页数据的SQL语句是：
+select * from emp  limit 10,10;
+3). 查询第3页的数据的SQL语句是：
+select * from emp  limit 20,10;
+观察以上SQL语句，发现： 开始索引一直在改变 ， 每页显示条数是固定的
+开始索引的计算公式：   开始索引 = (当前页码 - 1)  *  每页显示条数
+
+我们继续基于页面原型，继续分析，得出以下结论：
+1. 前端在请求服务端时，传递的参数
+  - 当前页码  page
+  - 每页显示条数  pageSize
+2. 后端需要响应什么数据给前端
+  - 所查询到的数据列表（存储到List 集合中）
+  - 总记录数
+[图片]
+后台给前端返回的数据包含：List集合(数据列表)、total(总记录数)
+而这两部分我们通常封装到PageResult对象中，并将该对象转换为json格式的数据响应回给浏览器。
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PageResult {
+        private Long total; //总记录数
+        private List rows; //当前页数据列表
+}
+
+3.2.2 接口描述
+1). 基本信息
+请求路径：/emps
+请求方式：GET
+接口描述：该接口用于员工列表数据的条件分页查询
+
+
+2). 请求参数
+见图img/请求参数.png
+
+请求数据样例：
+/emps?name=张&gender=1&begin=2007-09-01&end=2022-09-01&page=1&pageSize=10
+
+3). 响应数据
+参数格式：application/json
+参数说明：
+见图img/响应数据.png
+
+目前我们只考虑分页查询，先不考虑查询条件，
+而上述的接口文档中，与分页查询相关的参数就两个，一个是page，一个是pageSize。
+
+3.2.3 原始方式
+3.2.3.1 代码实现
+通过查看接口文档：员工列表查询
+请求路径：/emps
+请求方式：GET
+请求参数：跟随在请求路径后的参数字符串。  例：/emps?page=1&pageSize=10
+响应数据：json格式
+详细代码见EmpController等,或是飞书文档中08.3.2.3的课（飞书）中的代码实现部分。
+
+3.2.4 PageHelper分页插件
+3.2.4.1 介绍
+前面我们已经完了基础的分页查询，大家会发现：分页查询功能编写起来比较繁琐。 而分页查询的功能是非常常见的，我们查询员工信息需要分页查询，将来在做其他项目时，查询用户信息、订单信息、商品信息等等都是需要进行分页查询的。
+而分页查询的思路、步骤是比较固定的。 在Mapper接口中定义两个方法执行两条不同的SQL语句：
+1. 查询总记录数
+2. 指定页码的数据列表
+在Service当中，调用Mapper接口的两个方法，分别获取：总记录数、查询结果列表，然后在将获取的数据结果封装到PageBean对象中。
+大家思考下：在未来开发其他项目，只要涉及到分页查询功能(例：订单、用户、支付、商品)，都必须按照以上操作完成功能开发
+结论：原始方式的分页查询，存在着"步骤固定"、"代码频繁"的问题
+解决方案：可以使用一些现成的分页插件完成。对于Mybatis来讲现在最主流的就是PageHelper。
+
+PageHelper是第三方提供的Mybatis框架中的一款功能强大、方便易用的分页插件，支持任何形式的单标、多表的分页查询。
+官网：https://pagehelper.github.io/
+
+那接下来，我们可以对比一下，使用PageHelper分页插件进行分页 与 原始方式进行分页代码实现的上的差别。
+[图片]
+- Mapper接口层：
+  - 原始的分页查询功能中，我们需要在Mapper接口中定义两条SQL语句。
+  - PageHelper实现分页查询之后，只需要编写一条SQL语句，而且不需要考虑分页操作，就是一条正常的查询语句。
+- Service层：
+  - 需要根据页码、每页展示记录数，手动的计算起始索引。
+  - 无需手动计算起始索引，直接告诉PageHelper需要查询那一页的数据，每页展示多少条记录即可。
+
+3.2.4.4 实现机制
+我们打开Idea的控制台，可以看到在进行分页查询时，输出的SQL语句。
+[图片]
+我们看到执行了两条SQL语句，而这两条SQL语句，其实是从我们在Mapper接口中定义的SQL演变而来的。
+- 第一条SQL语句，用来查询总记录数。
+[图片]
+其实就是将我们编写的SQL语句进行的改造增强，将查询返回的字段列表替换成了 count(0) 来统计总记录数。
+
+- 第二条SQL语句，用来进行分页查询，查询指定页码对应 的数据列表。
+[图片]
+其实就是将我们编写的SQL语句进行的改造增强，在SQL语句之后拼接上了limit进行分页查询，而由于测试时查询的是第一页，起始索引是0，所以简写为limit ？。
+
+而PageHelper在进行分页查询时，会执行上述两条SQL语句，并将查询到的总记录数，与数据列表封装到了 Page<Emp> 对象中，我们再获取查询结果时，只需要调用Page对象的方法就可以获取。
+
+注意：
+- PageHelper实现分页查询时，SQL语句的结尾一定一定一定不要加分号(;).。
+- PageHelper只会对紧跟在其后的第一条SQL语句进行分页处理。、
+
+
+3.3 条件分页查询
+完了分页查询后，下面我们需要在分页查询的基础上，添加条件。
+3.3.1 需求
+[图片]
+通过员工管理的页面原型我们可以看到，员工列表页面的查询，不仅仅需要考虑分页，还需要考虑查询条件。 分页查询我们已经实现了，接下来，我们需要考虑在分页查询的基础上，再加上查询条件。
+我们看到页面原型及需求中描述，搜索栏的搜索条件有三个，分别是：
+- 姓名：模糊匹配
+- 性别：精确匹配
+- 入职日期：范围匹配
+
+3.3.2 接口描述
+参照接口文档中的 员工管理 -> 员工列表查询
+
+3.3.3 思路分析
+[图片]
+
+3.3.4 功能开发
+通过查看接口文档：员工列表查询
+请求路径：/emps
+请求方式：GET
+请求参数：
+见图img/请求参数2.png
+
+在原有分页查询的代码基础上进行改造。
+
+1). 在EmpController方法中通过多个方法形参，依次接收这几个参数
+@Slf4j
+@RestController
+@RequestMapping("/emps")
+public class EmpController {
+
+    @Autowired
+    private EmpService empService;
+
+    @GetMapping
+    public Result page(@RequestParam(defaultValue = "1") Integer page,
+                       @RequestParam(defaultValue = "10") Integer pageSize,
+                       String name, Integer gender,
+                       @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
+                       @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
+        log.info("查询请求参数： {}, {}, {}, {}, {}, {}", page, pageSize, name, gender, begin, end);
+        PageResult pageResult = empService.page(page, pageSize);
+        return Result.success(pageResult);
+    }
+}
+
+2). 修改EmpService及EmpServiceImpl中的代码逻辑
+EmpService：
+public interface EmpService {
+    /**
+     * 分页查询
+     */
+    PageResult page(Integer page, Integer pageSize, String name, Integer gender, LocalDate begin, LocalDate end);
+}
+EmpServiceImpl:
+/**
+ * 员工管理
+ */
+@Service
+public class EmpServiceImpl implements EmpService {
+
+    @Autowired
+    private EmpMapper empMapper;
+
+    @Override
+    public PageResult page(Integer page, Integer pageSize, String name, Integer gender, LocalDate begin, LocalDate end) {
+        //1. 设置PageHelper分页参数
+        PageHelper.startPage(page, pageSize);
+        //2. 执行查询
+        List<Emp> empList = empMapper.list(name, gender, begin, end);
+        //3. 封装分页结果
+        Page<Emp> p = (Page<Emp>) empList;
+        return new PageResult(p.getTotal(), p.getResult());
+    }
+}
+
+3). 调整EmpMapper接口方法
+@Mapper
+public interface EmpMapper {
+
+    /**
+     * 查询所有的员工及其对应的部门名称
+     */
+    public List<Emp> list(String name, Integer gender, LocalDate begin, LocalDate end);
+
+}
+由于SQL语句比较复杂，建议将SQL语句配置在XML映射文件中。
+
+4). 新增Mapper映射文件EmpMapper.xml
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.itheima.mapper.EmpMapper">
+    <select id="list" resultType="com.itheima.pojo.Emp">
+        select e.*, d.name deptName from emp as e left join dept as d on e.dept_id = d.id
+        where e.name like concat('%',#{name},'%')
+          and e.gender = #{gender}
+          and e.entry_date between #{begin} and #{end}
+    </select>
+</mapper>

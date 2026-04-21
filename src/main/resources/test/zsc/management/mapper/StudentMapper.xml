@@ -1,0 +1,178 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="test.zsc.management.mapper.StudentMapper">
+<!-- 查询所有学员   -->
+    <select id="findAll" resultType="test.zsc.management.pojo.Student">
+        select * from student
+    </select>
+<!--    增加学员 -->
+    <insert id="save">
+        insert into student
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">name,</if>
+            <if test="no != null and no != ''">no,</if>
+            <if test="gender != null">gender,</if>
+            <if test="phone != null and phone != ''">phone,</if>
+            <if test="idCard != null and idCard != ''">id_card,</if>
+            <if test="isCollege != null">is_college,</if>
+            <if test="address != null and address != ''">address,</if>
+            <if test="degree != null">degree,</if>
+            <if test="graduationDate != null">graduation_date,</if>
+            <if test="clazzId != null">clazz_id,</if>
+            <if test="violationCount != null">violation_count,</if>
+            <if test="violationScore != null">violation_score,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">#{name},</if>
+            <if test="no != null and no != ''">#{no},</if>
+            <if test="gender != null">#{gender},</if>
+            <if test="phone != null and phone != ''">#{phone},</if>
+            <if test="idCard != null and idCard != ''">#{idCard},</if>
+            <if test="isCollege != null">#{isCollege},</if>
+            <if test="address != null and address != ''">#{address},</if>
+            <if test="degree != null">#{degree},</if>
+            <if test="graduationDate != null">#{graduationDate},</if>
+            <if test="clazzId != null">#{clazzId},</if>
+            <if test="violationCount != null">#{violationCount},</if>
+            <if test="violationScore != null">#{violationScore},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+<!--    自定义结果集ResultMap-->
+    <resultMap id="studentResultMap" type="test.zsc.management.pojo.Student">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="no" property="no" />
+        <result column="gender" property="gender" />
+        <result column="phone" property="phone" />
+        <result column="id_card" property="idCard" />
+
+        <result column="is_college" property="isCollege" />
+        <result column="address" property="address" />
+        <result column="degree" property="degree" />
+        <result column="graduation_date" property="graduationDate" />
+        <result column="clazz_id" property="clazzId" />
+        <result column="violation_count" property="violationCount" />
+        <result column="violation_score" property="violationScore" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="clazz_name" property="clazzName" />
+    </resultMap>
+
+<!--    查询所有学员（原代码）  -->
+<!--    <select id="findAll" resultType="test.zsc.management.pojo.Student">-->
+<!--        select * from student-->
+<!--    </select>-->
+
+<!--    条件分页查询学员（新增）  -->
+    <select id="list" resultMap="studentResultMap">
+        select s.*, c.name as clazz_name
+        from student s
+        left join clazz c on s.clazz_id = c.id
+        <where>
+            <if test="name != null and name != ''">
+                s.name like concat('%', #{name}, '%')
+            </if>
+            <if test="degree != null">
+                and s.degree = #{degree}
+            </if>
+            <if test="clazzId != null">
+                and s.clazz_id = #{clazzId}
+            </if>
+        </where>
+        order by s.update_time desc
+    </select>
+
+<!--    增加学员 -->
+<!--    <select id="getById" parameterType="Integer" resultType="test.zsc.management.pojo.Student">-->
+    <select id="getById" parameterType="Integer" resultMap="studentResultMap">
+        select * from student where id = #{id}
+    </select>
+<!--    根据id删除学员-->
+    <delete id="deleteById" parameterType="Integer">
+        delete from student where id = #{id}
+    </delete>
+    <!--批量删除员工信息-->
+    <delete id="deleteByIds">
+        delete from emp where id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+<!--    更新学员基本信息-->
+    <update id="updateById">
+        update student
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="no != null and no != ''">no = #{no},</if>
+            <if test="gender != null">gender = #{gender},</if>
+            <if test="phone != null and phone != ''">phone = #{phone},</if>
+            <if test="idCard != null and idCard != ''">id_card = #{idCard},</if>
+            <if test="isCollege != null">is_college = #{isCollege},</if>
+            <if test="address != null and address != ''">address = #{address},</if>
+            <if test="degree != null">degree = #{degree},</if>
+            <if test="graduationDate != null">graduation_date = #{graduationDate},</if>
+            <if test="clazzId != null">clazz_id = #{clazzId},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+<!--    学员违纪处理（新增）-->
+    <update id="updateViolation">
+        update student
+        set violation_count = violation_count + 1,
+            violation_score = violation_score + #{score},
+            update_time = now()
+        where id = #{id}
+    </update>
+
+<!--    统计各个班级的学员人数-->
+<!--            1:java, 2:前端, 3:大数据, 4:Python, 5:Go, 6: 嵌入式'-->
+<!--    柱状图是total-->
+    <select id="countStudentClazzData" resultType="java.util.Map">
+        select
+            (case clazz_id when 1 then 'java'
+                      when 2 then '前端'
+                      when 3 then '大数据'
+                      when 4 then 'Python'
+                      when 5 then 'Go'
+                      when 6 then '嵌入式'
+                      else '其他' end)  pos,
+            count(*) total
+        from student group by clazz_id
+        order by total
+    </select>
+<!--    统计学员学历信息-->
+<!--    1:初中, 2:高中, 3:大专, 4:本科, 5:硕士, 6:博士-->
+<!--    扇形图是value不是total-->
+    <select id="countStudentDegreeData" resultType="java.util.Map">
+        select
+            (case degree when 1 then '初中'
+                           when 2 then '高中'
+                           when 3 then '大专'
+                           when 4 then '本科'
+                           when 5 then '硕士'
+                           when 6 then '博士'
+                           else '其他' end)  name,
+            count(*) value
+        from student group by degree
+    </select>
+
+
+
+
+
+
+
+
+
+
+
+
+</mapper>

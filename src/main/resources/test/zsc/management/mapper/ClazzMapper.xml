@@ -1,0 +1,91 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="test.zsc.management.mapper.ClazzMapper">
+
+    <!--自定义结果集ResultMap-->
+    <resultMap id="clazzResultMap" type="test.zsc.management.pojo.Clazz">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="room" property="room" />
+        <result column="begin_date" property="beginDate" />
+        <result column="end_date" property="endDate" />
+        <result column="master_id" property="masterId" />
+        <result column="subject" property="subject" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="master_name" property="masterName" />
+        <result column="status" property="status" />
+    </resultMap>
+
+    <!--查询所有班级（原代码）-->
+    <select id="findAll" resultMap="clazzResultMap">
+        select c.*, e.name as master_name,
+               (case
+                   when c.begin_date &gt; curdate() then '未开班'
+                   when c.end_date &lt; curdate() then '已结课'
+                   else '已开班' end) as status
+        from clazz c
+        left join emp e on c.master_id = e.id
+    </select>
+
+    <!--条件分页查询班级（新增）-->
+    <select id="list" resultMap="clazzResultMap">
+        select c.*, e.name as master_name,
+               (case
+                   when c.begin_date &gt; curdate() then '未开班'
+                   when c.end_date &lt; curdate() then '已结课'
+                   else '已开班' end) as status
+        from clazz c
+        left join emp e on c.master_id = e.id
+        <where>
+            <if test="name != null and name != ''">
+                c.name like concat('%', #{name}, '%')
+            </if>
+            <if test="begin != null and begin != '' and end != null and end != ''">
+                and c.begin_date between #{begin} and #{end}
+            </if>
+        </where>
+        order by c.begin_date desc
+    </select>
+
+    <!--新增班级-->
+    <insert id="save">
+        insert into clazz(name, room, begin_date, end_date, master_id, subject, create_time, update_time)
+        values(#{name}, #{room}, #{beginDate}, #{endDate}, #{masterId}, #{subject}, #{createTime}, #{updateTime})
+    </insert>
+
+    <!--根据id删除班级-->
+    <delete id="deleteById">
+        delete from clazz where id = #{id}
+    </delete>
+
+    <!--根据id查询班级-->
+    <select id="getById" resultMap="clazzResultMap">
+        select c.*, e.name as master_name,
+               (case
+                   when c.begin_date &gt; curdate() then '未开班'
+                   when c.end_date &lt; curdate() then '已结课'
+                   else '在读' end) as status
+        from clazz c
+        left join emp e on c.master_id = e.id
+        where c.id = #{id}
+    </select>
+
+    <!--修改班级-->
+    <update id="update">
+        update clazz
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="room != null and room != ''">room = #{room},</if>
+            <if test="beginDate != null">begin_date = #{beginDate},</if>
+            <if test="endDate != null">end_date = #{endDate},</if>
+            <if test="masterId != null">master_id = #{masterId},</if>
+            <if test="subject != null">subject = #{subject},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+</mapper>

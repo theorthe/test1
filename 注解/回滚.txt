@@ -1,0 +1,473 @@
+看了示例的讲义后问了ai
+
+深度思考
+```用户询问为什么抛出异常后事务没有回滚，从日志可以看到事务被提交了而不是回滚。
+这是因为 Spring 的 @Transactional 注解默认只对运行时异常（RuntimeException）和 Error 进行回滚，
+而用户代码中抛出的是受检异常（Exception），所以需要设置 rollbackFor 属性来指定回滚的异常类型。
+
+```
+从你提供的日志和代码来看，事务**没有回滚反而提交了**，原因在于：
+
+## 核心问题：Spring 事务默认只对 RuntimeException 回滚
+
+你的代码抛出的是 **`Exception`（受检异常）**：
+
+```java
+if(true){
+    throw new Exception("出现异常了~~~");  // ← 这是 Exception，不是 RuntimeException
+}
+```
+
+
+### Spring 事务的回滚规则
+
+```java
+@Transactional
+public void save(Emp emp) {
+    // ...
+    throw new Exception("出现异常了~~~");  // ❌ 不会回滚（受检异常）
+
+    throw new RuntimeException("出错了");  // ✅ 会回滚（运行时异常）
+}
+```
+
+
+**默认行为**：
+- ✅ **回滚**：`RuntimeException` 及其子类、`Error`
+- ❌ **不回滚**：`Exception` 及其子类（受检异常）
+
+## 解决方案
+
+### 方案 1：让 @Transactional 对 Exception 也回滚（推荐）
+
+在方法上添加 `rollbackFor` 参数：
+
+```java
+@Override
+@Transactional(rollbackFor = Exception.class)  // ← 添加这个
+public void save(Emp emp) {
+    //1.补全基础属性
+    emp.setCreateTime(LocalDateTime.now());
+    emp.setUpdateTime(LocalDateTime.now());
+
+    //2.保存员工基本信息
+    empMapper.insert(emp);
+
+    //模拟：异常发生
+    if(true){
+        throw new Exception("出现异常了~~~");  // 现在会回滚了
+    }
+
+    //3. 保存员工的工作经历信息 - 批量
+    Integer empId = emp.getId();
+    List<EmpExpr> exprList = emp.getExprList();
+    if(!CollectionUtils.isEmpty(exprList)){
+        exprList.forEach(empExpr -> empExpr.setEmpId(empId));
+        empExprMapper.insertBatch(exprList);
+    }
+}
+```
+
+
+### 方案 2：抛出 RuntimeException（修改异常类型）
+
+```java
+@Override
+@Transactional
+public void save(Emp emp) {
+    // ...
+
+    //模拟：异常发生
+    if(true){
+        throw new RuntimeException("出现异常了~~~");  // ← 改为 RuntimeException
+    }
+
+    // ...
+}
+```
+
+
+### 方案 3：手动回滚
+
+```java
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+
+@Override
+@Transactional
+public void save(Emp emp) {
+    try {
+        //1.补全基础属性
+        emp.setCreateTime(LocalDateTime.now());
+        emp.setUpdateTime(LocalDateTime.now());
+
+        //2.保存员工基本信息
+        empMapper.insert(emp);
+
+        //模拟：异常发生
+        if(true){
+            throw new Exception("出现异常了~~~");
+        }
+
+        //3. 保存员工的工作经历信息 - 批量
+        Integer empId = emp.getId();
+        List<EmpExpr> exprList = emp.getExprList();
+        if(!CollectionUtils.isEmpty(exprList)){
+            exprList.forEach(empExpr -> empExpr.setEmpId(empId));
+            empExprMapper.insertBatch(exprList);
+        }
+    } catch (Exception e) {
+        // 手动标记事务回滚
+        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        throw e;
+    }
+}
+```
+
+
+## 为什么这样设计？
+
+Spring 的设计哲学：
+- **RuntimeException**：程序错误，通常是 bug，应该回滚
+- **Exception（受检异常）**：业务异常，可能是可预期的，不一定需要回滚
+
+例如：
+```java
+// 账户余额不足 - 业务异常，可能不需要回滚整个事务
+throw new InsufficientBalanceException("余额不足");
+
+// 数据库连接失败 - 系统错误，必须回滚
+throw new RuntimeException("数据库异常");
+```
+
+
+## 最佳实践
+
+在实际开发中，**推荐对所有异常都回滚**：
+
+```java
+@Transactional(rollbackFor = Exception.class)
+public void save(Emp emp) {
+    // 这样无论是 RuntimeException 还是 Exception 都会回滚
+}
+```
+
+
+或者在类级别统一配置：
+
+```java
+@Service
+@Transactional(rollbackFor = Exception.class)  // ← 类级别配置
+public class EmpServiceImpl implements EmpService {
+
+    @Override
+    public void save(Emp emp) {
+        // 所有方法都会对 Exception 回滚
+    }
+}
+```
+
+
+## 你的日志分析
+
+从日志可以看到：
+
+```
+Transaction synchronization committing SqlSession  ← 提交事务
+Transaction synchronization deregistering SqlSession
+Transaction synchronization closing SqlSession
+...
+Initiating transaction commit  ← 再次确认提交
+Committing JDBC transaction on Connection  ← 最终提交
+```
+
+
+说明事务确实**没有回滚**，因为 `Exception` 不在默认回滚范围内。
+
+**修改后加上 `@Transactional(rollbackFor = Exception.class)`，再测试就会看到回滚了！**
+
+深度思考
+```用户在询问为什么在 `save(Emp emp)` 方法中直接 `throw new Exception("出现异常了~~~")` 不会报语法错误。
+
+1.  **分析代码上下文**：
+    用户选中的代码片段如下：
+    ```java
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void save(Emp emp) {
+        // ...
+        if(true){
+            throw new Exception("出现异常了~~~");
+        }
+        // ...
+    }
+    ```
+
+2.  **Java 异常体系基础**：
+    *   `Exception` 是 **Checked Exception（受检异常）**。
+    *   Java 语法规定：Checked Exception 必须被处理（try-catch）或者在方法签名上声明抛出（throws）。
+    *   `RuntimeException` 是 **Unchecked Exception（非受检异常）**，可以不处理也不声明。
+
+3.  **矛盾点**：
+    用户选中的代码中，`save` 方法的签名是 `public void save(Emp emp)`，并没有 `throws Exception`。
+    但是方法体内直接 `throw new Exception(...)`。
+    在标准的 Java 类/接口定义中，如果接口 `EmpService` 的方法没有 `throws Exception`，实现类 `save` 方法也不能直接 throw `Exception`，否则编译器会报错 "Unhandled exception: java.lang.Exception"。
+
+4.  **寻找原因**：
+    为什么这里不报错？
+    *   **可能性 1：接口定义了 throws Exception。**
+        查看 `EmpService` 接口定义。如果 `EmpService.save(Emp emp)` 声明了 `throws Exception`，那么实现类可以不处理。
+    *   **可能性 2：这是伪代码/演示代码。**
+        用户提供的 `回滚.txt` 文件可能只是用来讲解原理的示例，并不是可以直接编译运行的源码，或者用户在这个文件里写代码时没有严格遵循 Java 规范，只是在记事本里写着玩。
+    *   **可能性 3：用户看错了，或者代码被截断了。**
+    *   **可能性 4：Spring AOP 代理机制？**
+        不，AOP 是运行时的，编译时语法检查还是看接口定义。
+
+5.  **验证接口定义**：
+    需要检查 `EmpService.java` 中 `save` 方法的定义。
+    根据之前提供的 `src/main/java/test/zsc/management/service/EmpService.java` 信息（虽然没完整读，但通常业务方法不抛受检异常）。
+    让我们回忆一下通常的业务写法：
+    `void save(Emp emp);` -> 如果这样，实现类里 throw Exception 必报错。
+    `void save(Emp emp) throws Exception;` -> 如果这样，就不报错。
+
+6.  **最可能的解释**：
+    *   **原因一（最可能）**：接口 `EmpService` 中 `save` 方法声明了 `throws Exception`。
+    *   **原因二**：这是一个演示用的“伪代码”或者“测试代码”，用户可能只是在 txt 文件里随手写的，或者在 IDE 里写的时候其实报红了，但为了演示回滚原理强行忽略。
+    *   **原因三**：用户可能记错了，或者这里的 `Exception` 其实被 try-catch 包裹了（但在选中的代码里没看到 try-catch）。
+
+    结合用户的问题是“为什么不报语法错”，这暗示代码可能在 IDE 里确实没报错。
+
+    **关键线索**：用户提供的代码片段中 `@Override`。这说明它实现了接口。
+    如果接口方法是 `void save(Emp emp)`，实现类写 `throw new Exception()` 是**必报语法错**的。
+    除非接口方法是 `void save(Emp emp) throws Exception`。
+
+    **但是**，在实际的 Spring Boot 开发规范中，业务层方法通常**不**声明 throws Checked Exception，而是直接 throw RuntimeException，或者在 Controller 层统一处理。
+
+    **另一种可能**：
+    用户可能是在 `ManagementApplicationTests` 测试类里写的？或者这是一个单独的演示类？
+    看文件名 `回滚.txt`，这很可能是一个**笔记文件**，而不是正在运行的 Java 文件。
+    如果是在 txt 文件里，当然没有语法检查。
+    如果用户是问“如果在 Java 代码里这样写，为什么不报错”，那肯定是接口有声明。
+
+    **再看一眼用户的截图/上下文**：
+    用户之前发了一个日志截图，里面显示 `java.lang.Exception: 保存员工基本信息失败`。
+    这说明代码真的抛出了 `Exception`。
+    而且日志里有 `EmpServiceImpl.save(EmpServiceImpl.java:63)`。
+    这证实了这确实是 `EmpServiceImpl` 中的代码。
+
+    如果 `EmpServiceImpl.save` 真的能编译通过并运行，那么只有一种可能：
+    **接口 `EmpService` 的 `save` 方法声明了 `throws Exception`。**
+
+    让我们快速确认一下 `EmpService` 的定义。虽然没直接看到，但这是唯一合理解释。
+
+    **修正思路**：
+    通常业务开发中，`save` 方法不应该抛出 `Exception`（Checked Exception），而是抛出 `RuntimeException`。
+    如果用户代码里真的写的是 `throw new Exception(...)` 且没报错，那肯定是接口里写了 `throws Exception`。
+
+    **或者**，用户其实写的是 `RuntimeException` 但记错了？
+    不，用户明确问 `throw new Exception`。
+
+    **或者**，用户其实包了一层 `try { ... throw new Exception(); } catch (Exception e) { throw new RuntimeException(e); }`？
+    选中的代码没显示。
+
+    **最合理的推测**：
+    这是一个教学/演示场景。
+    1.  接口 `EmpService` 定义了 `void save(Emp emp) throws Exception;`。
+    2.  或者，这其实是一个**自定义异常**？不，`java.lang.Exception` 是受检异常。
+
+    让我们给出最准确的解释：
+    **如果这是在 IDE 的 .java 文件中且不报错，唯一的解释是接口 `EmpService` 的 `save` 方法签名上声明了 `throws Exception`。**
+
+    但更有可能的情况是：**这是一个用于讲解原理的“伪代码”或者“笔记”**（文件名叫 `回滚.txt`），在纯文本里当然没有语法检查。如果复制到 Java 文件里，大概率是会报 `Unhandled exception` 的，除非接口有 `throws`。
+
+    **综合回答策略**：
+    1.  直接指出：在标准 Java 中，`Exception` 是受检异常，必须处理或声明。
+    2.  解释为什么不报错的两种可能：
+        *   可能性 A：接口 `EmpService` 中定义了 `throws Exception`。
+        *   可能性 B：这只是个笔记/伪代码（txt 文件），或者其实底层抛出的是 `RuntimeException` 但用户写笔记时简写了。
+    3.  给出最佳实践：建议实际开发中抛 `RuntimeException`，不要抛 `Exception`。
+
+    **再次检查代码片段**：
+    代码片段中有 `@Override`。
+    如果接口没写 throws，实现类写了 throw，编译必挂。
+    所以肯定是接口写了。
+
+    但是，为了严谨，我应该引导用户检查接口定义。
+
+    **补充思考**：
+    有没有可能用了 Lombok 的 `@SneakyThrows`？
+    如果类上或者方法上加了 `@SneakyThrows`，那么 throw checked exception 也不会报错。
+    这是一个很常见的“黑科技”。
+    查看类定义？
+    之前的 `EmpServiceImpl` 类定义：
+    ```java
+    @Service
+    public class EmpServiceImpl implements EmpService { ... }
+    ```
+    没看到 `@SneakyThrows`。
+
+    **结论**：
+    最可能是因为接口定义了 `throws Exception`。
+    或者是笔记文件。
+
+    回答结构：
+    1.  **直接回答**：在 Java 中 `Exception` 是受检异常，通常必须 try-catch 或 throws。
+    2.  **分析原因**：
+        *   原因一：接口 `EmpService` 的 `save` 方法声明了 `throws Exception`。
+        *   原因二：这可能只是笔记（txt），不是实际运行的代码。
+    3.  **扩展知识**：实际开发中不推荐这样写，推荐抛 `RuntimeException`。
+
+    这样回答既专业又解决了疑惑。
+
+```
+这里直接 `throw new Exception("...")` 却不报语法错误，通常是因为以下 **两个原因之一**：
+
+### 1. 接口方法声明了 `throws Exception`（最可能的原因）
+
+在 Java 中，`java.lang.Exception` 是 **Checked Exception（受检异常）**，编译器强制要求必须处理它。
+
+如果你的代码能编译通过且不报错，说明接口 `EmpService` 中的 `save` 方法签名一定声明了 `throws Exception`。
+
+**请检查你的 `EmpService.java` 接口：**
+
+```java
+// EmpService.java
+public interface EmpService {
+    // 只有接口声明了 throws Exception，实现类里才能直接 throw new Exception() 而不报错
+    void save(Emp emp) throws Exception;
+}
+```
+
+
+**实现类：**
+```java
+// EmpServiceImpl.java
+@Override
+public void save(Emp emp) throws Exception { // 实现类通常会自动继承接口的 throws
+    // ...
+    if(true){
+        throw new Exception("出现异常了~~~"); // ✅ 因为接口说了会抛，所以这里不报错
+    }
+}
+```
+
+### ⚠️ 实际开发建议
+
+在实际的 Spring Boot 业务开发中，**不推荐**在 Service 层抛出 `Exception`（受检异常），因为：
+1.  **代码冗余**：接口和实现类都要写 `throws Exception`。
+2.  **Spring 事务默认不回滚**：如前所述，受检异常默认不回滚，必须加 `rollbackFor`。
+
+**最佳实践是抛出 `RuntimeException`（运行时异常）：**
+
+```java
+@Override
+@Transactional // 不需要 rollbackFor，默认就会回滚
+public void save(Emp emp) {
+    // ...
+    if(true){
+        // ✅ 推荐写法：RuntimeException 不需要 try-catch，也不需要 throws，且事务默认回滚
+        throw new RuntimeException("保存失败");
+    }
+}
+```
+。
+
+
+2. 修改员工
+[图片]
+在进行修改员工信息的时候，我们首先先要根据员工的ID查询员工的详细信息用于页面回显展示，然后用户修改员工数据之后，点击保存按钮，就可以将修改的数据提交到服务端，保存到数据库。 具体操作为：
+1. 根据ID查询员工信息
+2. 保存修改的员工信息
+
+2.1 查询回显
+2.1.1 接口描述
+参照资料中提供的接口文档，查看 员工管理  -> 根据ID查询 接口的描述。
+
+2.1.2 思路
+在查询回显时，既需要查询出员工的基本信息，又需要查询出该员工的工作经历信息。
+[图片]
+我们可以先通过一条SQL语句，查询出指定员工的基本信息，及其员工的工作经历信息。SQL如下：
+select e.*,
+       ee.id ee_id,
+       ee.begin ee_begin,
+       ee.end ee_end,
+       ee.company ee_company,
+       ee.job ee_job
+from emp e left join emp_expr ee on e.id = ee.emp_id where e.id = 39;
+具体的实现思路如下：
+[图片]
+
+2.1.3 代码实现
+1). EmpController 添加 getInfo 用来根据ID查询员工数据，用于页面回显
+/**
+ * 查询回显
+ */
+@GetMapping("/{id}")
+public Result getInfo(@PathVariable Integer id){
+    log.info("根据id查询员工的详细信息");
+    Emp emp  = empService.getInfo(id);
+    return Result.success(emp);
+}
+
+2). EmpService 接口中增加 getInfo 方法
+/**
+ * 根据ID查询员工的详细信息
+ */
+Emp getInfo(Integer id);
+
+3). EmpServiceImpl 实现类中实现 `getInfo` 方法
+@Override
+public Emp getInfo(Integer id) {
+    return empMapper.getById(id);
+}
+
+4). EmpMapper 接口中增加 getById 方法
+/**
+ * 根据ID查询员工详细信息
+ */
+Emp getById(Integer id);
+
+5).  EmpMapper.xml 配置文件中定义对应的SQL
+<!--自定义结果集ResultMap-->
+<resultMap id="empResultMap" type="com.itheima.pojo.Emp">
+    <id column="id" property="id" />
+    <result column="username" property="username" />
+    <result column="password" property="password" />
+    <result column="name" property="name" />
+    <result column="gender" property="gender" />
+    <result column="phone" property="phone" />
+    <result column="job" property="job" />
+    <result column="salary" property="salary" />
+    <result column="image" property="image" />
+    <result column="entry_date" property="entryDate" />
+    <result column="dept_id" property="deptId" />
+    <result column="create_time" property="createTime" />
+    <result column="update_time" property="updateTime" />
+
+    <!--封装exprList-->
+    <collection property="exprList" ofType="com.itheima.pojo.EmpExpr">
+        <id column="ee_id" property="id"/>
+        <result column="ee_company" property="company"/>
+        <result column="ee_job" property="job"/>
+        <result column="ee_begin" property="begin"/>
+        <result column="ee_end" property="end"/>
+        <result column="ee_empid" property="empId"/>
+    </collection>
+</resultMap>
+
+<!--根据ID查询员工的详细信息-->
+<select id="getById" resultMap="empResultMap">
+    select e.*,
+        ee.id ee_id,
+        ee.emp_id ee_empid,
+        ee.begin ee_begin,
+        ee.end ee_end,
+        ee.company ee_company,
+        ee.job ee_job
+    from emp e left join emp_expr ee on e.id = ee.emp_id
+    where e.id = #{id}
+</select>
+在这种一对多的查询中，我们要想成功的封装的结果，需要手动的基于 <resultMap> 来进行封装结果。
+
+Mybatis中封装查询结果，什么时候用 resultType，什么时候用resultMap ？
+- 如果查询返回的字段名与实体的属性名可以直接对应上，用resultType 。
+- 如果查询返回的字段名与实体的属性名对应不上，或实体属性比较复杂，可以通过resultMap手动封装 。
