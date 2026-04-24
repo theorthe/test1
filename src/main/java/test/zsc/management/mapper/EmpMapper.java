@@ -78,5 +78,10 @@ public interface EmpMapper {
     @MapKey("name")
     List<Map> countEmpGenderData();
 
+    /**
+     * 修改员工密码
+     */
+    @Update("update emp set password = #{password}, update_time = #{updateTime} where id = #{id}")
+    void updatePassword(@Param("id") Integer id, @Param("password") String password, @Param("updateTime") java.time.LocalDateTime updateTime);
 
 }

@@ -145,9 +145,11 @@
                       when 6 then '嵌入式'
                       else '其他' end)  pos,
             count(*) total
-        from student group by clazz_id
+        from student 
+        group by pos
         order by total
     </select>
+<!--    from student group by clazz_id-->
 <!--    统计学员学历信息-->
 <!--    1:初中, 2:高中, 3:大专, 4:本科, 5:硕士, 6:博士-->
 <!--    扇形图是value不是total-->

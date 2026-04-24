@@ -2,7 +2,6 @@ package test.zsc.management.service.imql;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
-import lombok.SneakyThrows;
 
 import test.zsc.management.mapper.EmpExprMapper;
 import test.zsc.management.mapper.EmpMapper;
@@ -14,16 +13,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import test.zsc.management.utils.JwtUtils;
 /*
   CollectionUtils 功能详解：
   CollectionUtils 是 Spring 框架提供的集合工具类，
   用于简化集合（List、Set、Map 等）的常见操作。
  */
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 员工管理
@@ -186,7 +187,15 @@ public PageResult page(EmpQueryParam empQueryParam) {
             //EmpLog empLog = new EmpLog(null, LocalDateTime.now(), emp.toString());
             //empLogService.insertLog(empLog);
             try {
-                EmpLog empLog = new EmpLog(null, LocalDateTime.now(), emp.toString());
+                EmpLog empLog = new EmpLog();
+                empLog.setOperateEmpId(null); // TODO: 从JWT token中获取当前登录用户ID
+                empLog.setOperateTime(LocalDateTime.now());
+                empLog.setClassName(this.getClass().getName());
+                empLog.setMethodName("add");
+                empLog.setMethodParams(emp.toString());
+                empLog.setReturnValue("null");
+                empLog.setCostTime(0); // TODO: 计算方法执行耗时
+                empLog.setOperateEmpName(null); // TODO: 从JWT token中获取当前登录用户姓名
                 empLogService.insertLog(empLog);
             } catch (Exception e) {
                 // 记录日志失败，但不影响主业务
@@ -231,13 +240,48 @@ public PageResult page(EmpQueryParam empQueryParam) {
             empExprMapper.insertBatch(exprList);
         }
     }
+
+//    原来的没用JWT令牌
+//    @Override
+//    public LoginInfo login(Emp emp) {
+//        Emp empLogin = empMapper.getUsernameAndPassword(emp);
+//        if(empLogin != null){
+//            LoginInfo loginInfo = new LoginInfo(empLogin.getId(), empLogin.getUsername(), empLogin.getName(), null);
+//            return loginInfo;
+//        }
+//        return null;
+//    }
     @Override
     public LoginInfo login(Emp emp) {
         Emp empLogin = empMapper.getUsernameAndPassword(emp);
         if(empLogin != null){
-            LoginInfo loginInfo = new LoginInfo(empLogin.getId(), empLogin.getUsername(), empLogin.getName(), null);
+            //1. 生成JWT令牌
+            Map<String,Object> dataMap = new HashMap<>();
+            dataMap.put("id", empLogin.getId());
+            dataMap.put("username", empLogin.getUsername());
+
+            String jwt = JwtUtils.generateJwt(dataMap);
+            LoginInfo loginInfo = new LoginInfo(empLogin.getId(), empLogin.getUsername(), empLogin.getName(), jwt);
             return loginInfo;
         }
         return null;
+    }
+
+    @Override
+    public boolean updatePassword(Integer id, String oldPassword, String newPassword) {
+        // 1. 验证旧密码是否正确
+        Emp emp = new Emp();
+        emp.setId(id);
+        emp.setPassword(oldPassword);
+        Emp existEmp = empMapper.getUsernameAndPassword(emp);
+        
+        if (existEmp == null) {
+            // 旧密码不正确
+            return false;
+        }
+        
+        // 2. 更新密码
+        empMapper.updatePassword(id, newPassword, LocalDateTime.now());
+        return true;
     }
 }

@@ -6,7 +6,8 @@
 
     <!--分页查询日志-->
     <select id="list" resultType="test.zsc.management.pojo.EmpLog">
-        select id, operate_time, info
+        select id, operate_emp_id, operate_time, class_name, method_name, 
+               method_params, return_value, cost_time, operate_emp_name
         from emp_log
         order by operate_time desc
     </select>

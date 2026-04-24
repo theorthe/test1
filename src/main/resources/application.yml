@@ -26,21 +26,6 @@ mybatis:
     #是建立在 convention之上的,即Java对象属性名必须与数据库字段名一致。
     map-underscore-to-camel-case: true
     #spring事务管理日志
-#这个配置在 `application.yml` 的 `mybatis.configuration` 节点下是**不可行**的。
-#
-#**原因分析：**
-#1.  **层级错误**：`logging` 是 Spring Boot 的顶级配置项，应该与 `spring`、`mybatis` 同级，而不是嵌套在 `mybatis.configuration` 下面。MyBatis 无法识别 `logging` 配置。
-#2.  **语法/逻辑错误**：即使层级正确，YAML 中配置日志级别通常直接放在 `logging.level` 下。
-#
-#**修正建议：**
-#由于你要求只重写选中的代码，且选中区域位于 `mybatis.configuration` 内部，正确的做法是**删除**这段错误的配置。你应该将日志配置移动到文件的根层级（与 `spring` 和 `mybatis` 同级）。
-#
-#因此，选中的代码应该被移除（留空或注释掉，但为了保持 YAML 结构干净，通常直接删除该无效块）。如果必须保留占位符以符合“重写”格式，我将提供空内容，意味着你应该删除这几行，并在文件末尾添加正确的 logging 配置。
-#
-#但是，根据指令“重写选中的代码”，如果我只是删除它，可能不符合用户期望的“修正”。但在这个位置确实无法放置 logging 配置。
-#
-#**最佳操作：**
-#删除选中的错误代码。请在文件根部（例如 `mybatis` 结束后）添加以下配置：
 logging:
   level:
     org.springframework.jdbc.support.JdbcTransactionManager: debug
@@ -56,3 +41,8 @@ aliyun:
     endpoint: https://oss-cn-beijing.aliyuncs.com
     bucketName: java-tset-zsc-01
     region: cn-beijing
+
+# JWT配置
+jwt:
+  sign-key: ${JWT_SIGN_KEY:SVRIRUlNQQ==}  # 优先从环境变量读取，否则使用默认值
+  expire: 43200000  # 12小时（毫秒）

@@ -4,6 +4,7 @@ package test.zsc.management.controller;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import test.zsc.management.annotate.LogOperation;
 import test.zsc.management.pojo.Clazz;
 import test.zsc.management.pojo.PageResult;
 import test.zsc.management.pojo.Result;
@@ -53,6 +54,7 @@ public class ClazzController {
     }
 
     // 添加班级（对应文档 3.3）
+    @LogOperation
     @PostMapping
     public Result save(@RequestBody Clazz clazz) {
         log.info("新增班级: {}", clazz);
